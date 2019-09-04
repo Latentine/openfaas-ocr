@@ -3,6 +3,9 @@ try:
 except ImportError as e:
     from PIL import Image
 
+import ocrmypdf
+
+
 import io
 import pytesseract
 import urllib.request
@@ -12,6 +15,7 @@ from urllib.parse import urlparse
 from os.path import splitext
 import base64
 import binascii
+import textract
 
 
 ALLOWED_IMAGE_TYPE = [".jpeg", ".png", ".jpg", ".pdf"]
@@ -27,7 +31,7 @@ def save_image_from_url(url):
     """Saves image from an URL to local and retruns path"""
 
     ext = get_ext(url)
-    local_file_path = "/tmp/" + str(uuid4()) + ext
+    local_file_path = "./tmp/" + str(uuid4()) + ext
     urllib.request.urlretrieve(url, local_file_path)
     return local_file_path
 
@@ -35,7 +39,7 @@ def save_image_from_url(url):
 def save_image_from_base64(encoded_string, ext):
     """Saves image to local from base64 encoded string and returns path"""
 
-    local_file_path = "/tmp/" + str(uuid4()) + "." + ext
+    local_file_path = "./tmp/" + str(uuid4()) + "." + ext
     with open(local_file_path, "wb") as fh:
         fh.write(base64.decodebytes(bytes(encoded_string, 'utf-8')))
     return local_file_path
@@ -50,33 +54,12 @@ def get_image_format(base64_string):
 
 
 def handle(req):
-    try:
-        base64.decodebytes(bytes(req, 'utf-8'))
 
-        try:
-            image_format = get_image_format(req)
-            if image_format not in ['JPG', 'JPEG', 'PNG', "PDF"]:
-                print("Only JPEG or PNG images are allowed.")
-                return
-            file_path = save_image_from_base64(req, image_format)
+    decoded = base64.decodebytes(bytes(req, 'utf-8'))
+    file_path = save_image_from_base64(req, 'pdf')
 
-        except OSError:
-            print(
-                "Only JPG/PNG/PDF images base64 encoded are acceptable inputs")
-            return
+    ocrmypdf.ocr(file_path, './tmp/output.pdf', deskew=True)
 
-    except binascii.Error:
-        if not len(req):
-            print("Request body is missing.")
-            return
+    text = textract.process('./tmp/output.pdf')
 
-        if get_ext(req) not in ALLOWED_IMAGE_TYPE:
-            print("Only JPEG, PNG, or PDF images are allowed.")
-            return
-
-        file_path = save_image_from_url(req)
-
-    img = Image.open(file_path)
-    text = pytesseract.image_to_string(img, lang='eng')
-    os.remove(file_path)
     print(text)
