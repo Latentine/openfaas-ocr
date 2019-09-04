@@ -14,7 +14,8 @@ import base64
 import binascii
 
 
-ALLOWED_IMAGE_TYPE = [".jpeg", ".png", ".jpg"]
+ALLOWED_IMAGE_TYPE = [".jpeg", ".png", ".jpg", ".pdf"]
+
 
 def get_ext(url):
     parsed = urlparse(url)
@@ -24,7 +25,7 @@ def get_ext(url):
 
 def save_image_from_url(url):
     """Saves image from an URL to local and retruns path"""
-    
+
     ext = get_ext(url)
     local_file_path = "/tmp/" + str(uuid4()) + ext
     urllib.request.urlretrieve(url, local_file_path)
@@ -54,26 +55,27 @@ def handle(req):
 
         try:
             image_format = get_image_format(req)
-            if image_format not in ['JPG', 'JPEG', 'PNG']:
+            if image_format not in ['JPG', 'JPEG', 'PNG', "PDF"]:
                 print("Only JPEG or PNG images are allowed.")
                 return
             file_path = save_image_from_base64(req, image_format)
-        
-        except OSError as e:
-            print("Not a valid image file. Only JPEG or PNG images base64 encoded are acceptable inputs.")
+
+        except OSError:
+            print(
+                "Only JPG/PNG/PDF images base64 encoded are acceptable inputs")
             return
 
     except binascii.Error:
         if not len(req):
             print("Request body is missing.")
             return
-                
+
         if get_ext(req) not in ALLOWED_IMAGE_TYPE:
-            print("Only JPEG or PNG images are allowed.")
+            print("Only JPEG, PNG, or PDF images are allowed.")
             return
-        
+
         file_path = save_image_from_url(req)
-    
+
     img = Image.open(file_path)
     text = pytesseract.image_to_string(img, lang='eng')
     os.remove(file_path)
